@@ -81,11 +81,11 @@ CANNOT VERIFY
 
 ## Browser walkthrough
 
-`scripts/browser_check.py` clicks through every page, button and error path in a real browser (WebKit) and prints PASS or FAIL for each of about 58 checks. Setup is in the file's header.
+`scripts/browser_check.py` clicks through every page, button and error path in a real browser (WebKit) and prints PASS or FAIL for each of 58 checks. Setup is in the file's header.
 
 It covers the welcome links, all four samples, real CSV uploads, three bad files, both demo banks with consent and cancel, the PDF download and its contents, the email link, the landlord link and QR code, evidence tables, saving to an account, sign in and out, wrong and oddly typed verification codes, a name containing HTML, and phone-width layout on every screen.
 
-On 13 October 2026, 56 of 58 passed. The two failures were in the script, not the app: one check expected the wrong count of saved passports, and one flagged a browser message about a request cut off by navigation. Both are corrected in the version in this repository, which has not been re-run since.
+On 13 October 2026, all 58 checks passed against the running app.
 
 ## What the tests do not show
 

@@ -23,9 +23,10 @@ def check(name, ok, extra=""):
     results.append((name, bool(ok), extra)); print(("PASS " if ok else "FAIL ") + name + (f"  [{extra}]" if extra and not ok else ""), flush=True)
 def body(pg): return pg.inner_text("body")
 def clean(pg, name): t = body(pg); check(f"{name}: no error trace", "Traceback" not in t and "Error:" not in t, t[:200])
+# Page errors saying "Load failed" are requests cut off by navigation, not app faults, so they are ignored.
 def start(b, **kw):
     pg = b.new_page(viewport={"width":1100,"height":850}, accept_downloads=True, **kw)
-    pg.on("pageerror", lambda e: "Load failed" in str(e) or errors.append(str(e)))  # ignore requests cut off by navigation; pg.goto(URL); pg.wait_for_selector("text=Get started", timeout=30000); return pg
+    pg.on("pageerror", lambda e: "Load failed" in str(e) or errors.append(str(e))); pg.goto(URL); pg.wait_for_selector("text=Get started", timeout=30000); return pg
 def to_upload(pg):
     pg.get_by_role("button", name="Get started").click(); pg.wait_for_selector("text=Add your bank statement")
 def again(pg):
