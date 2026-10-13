@@ -1,0 +1,443 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Credit Passport",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/younis-y/credit-passport",
+      "revision": "83cafd68ba6608b8ce906668bff380ce9fdf0f94",
+      "provider": "github"
+    },
+    "legend": {
+      "mode": "auto",
+      "entries": {
+        "frontend": {
+          "label": "User interface"
+        },
+        "backend": {
+          "label": "Python module"
+        },
+        "external": {
+          "label": "Output or external API"
+        },
+        "database": {
+          "label": "Local JSON storage"
+        }
+      }
+    },
+    "views": [
+      {
+        "id": "browser-path",
+        "label": "Check",
+        "focus": [
+          "browser",
+          "streamlit",
+          "pipeline",
+          "rules"
+        ],
+        "note": "Upload with a selected currency, or use simulated bank data; fixed rules produce the findings."
+      },
+      {
+        "id": "pdf-reading",
+        "label": "PDF input",
+        "focus": [
+          "pipeline",
+          "parser",
+          "anthropic"
+        ],
+        "note": "CSV stays local. PDF text is extracted locally and sent to Anthropic for row transcription."
+      },
+      {
+        "id": "saved-summary",
+        "label": "Registry",
+        "focus": [
+          "streamlit",
+          "registry"
+        ],
+        "note": "The web app writes a summary, issues a code and later reads it by code or an unverified demo account."
+      },
+      {
+        "id": "report-path",
+        "label": "PDF output",
+        "focus": [
+          "cli",
+          "streamlit",
+          "report",
+          "fx"
+        ],
+        "note": "Streamlit offers PDF, QR and mailto links. The CLI generates PDFs without registry codes."
+      }
+    ]
+  },
+  "layout": {
+    "mode": "grid",
+    "origin": [
+      50,
+      70
+    ],
+    "cols": 4,
+    "cellW": 180,
+    "cellH": 70,
+    "gapX": 120,
+    "gapY": 80
+  },
+  "components": [
+    {
+      "id": "report",
+      "type": "backend",
+      "label": "Report builder",
+      "sublabel": "ReportLab \u00b7 PDF bytes",
+      "row": 0,
+      "col": 1,
+      "sources": [
+        {
+          "path": "passport/report.py",
+          "line": 17,
+          "end_line": 69
+        }
+      ],
+      "size": [
+        150,
+        70
+      ]
+    },
+    {
+      "id": "cli",
+      "type": "frontend",
+      "label": "Command line",
+      "sublabel": "python -m passport",
+      "row": 0,
+      "col": 2,
+      "sources": [
+        {
+          "path": "passport/__main__.py",
+          "line": 16,
+          "end_line": 37
+        }
+      ],
+      "size": [
+        150,
+        70
+      ]
+    },
+    {
+      "id": "browser",
+      "type": "frontend",
+      "label": "Browser",
+      "sublabel": "Upload / verify / account",
+      "row": 1,
+      "col": 0,
+      "sources": [
+        {
+          "path": "app.py",
+          "line": 153,
+          "end_line": 212
+        },
+        {
+          "path": "app.py",
+          "line": 239,
+          "end_line": 312
+        }
+      ],
+      "size": [
+        150,
+        70
+      ]
+    },
+    {
+      "id": "streamlit",
+      "type": "frontend",
+      "label": "Streamlit app",
+      "sublabel": "Session + cache",
+      "row": 1,
+      "col": 1,
+      "sources": [
+        {
+          "path": "app.py",
+          "line": 100,
+          "end_line": 141
+        },
+        {
+          "path": "app.py",
+          "line": 314,
+          "end_line": 424
+        }
+      ],
+      "size": [
+        150,
+        70
+      ]
+    },
+    {
+      "id": "pipeline",
+      "type": "backend",
+      "label": "Pipeline",
+      "sublabel": "run() + currency",
+      "row": 1,
+      "col": 2,
+      "sources": [
+        {
+          "path": "passport/pipeline.py",
+          "line": 15,
+          "end_line": 38
+        }
+      ],
+      "size": [
+        150,
+        70
+      ]
+    },
+    {
+      "id": "rules",
+      "type": "backend",
+      "label": "Fixed rules",
+      "sublabel": "Balances + summary",
+      "row": 1,
+      "col": 3,
+      "sources": [
+        {
+          "path": "passport/rules.py",
+          "line": 42,
+          "end_line": 109
+        }
+      ],
+      "size": [
+        150,
+        70
+      ]
+    },
+    {
+      "id": "fx",
+      "type": "external",
+      "label": "Frankfurter API",
+      "sublabel": "Currency to GBP rate",
+      "row": 0,
+      "col": 0,
+      "sources": [
+        {
+          "path": "app.py",
+          "line": 23,
+          "end_line": 29
+        },
+        {
+          "path": "app.py",
+          "line": 100,
+          "end_line": 107
+        }
+      ],
+      "size": [
+        150,
+        70
+      ]
+    },
+    {
+      "id": "parser",
+      "type": "backend",
+      "label": "Statement parser",
+      "sublabel": "pandas / pdfplumber",
+      "row": 2,
+      "col": 2,
+      "sources": [
+        {
+          "path": "passport/parse.py",
+          "line": 40,
+          "end_line": 97
+        }
+      ],
+      "size": [
+        150,
+        70
+      ]
+    },
+    {
+      "id": "anthropic",
+      "type": "external",
+      "label": "Anthropic API",
+      "sublabel": "PDF text to rows",
+      "row": 2,
+      "col": 3,
+      "sources": [
+        {
+          "path": "passport/parse.py",
+          "line": 59,
+          "end_line": 79
+        }
+      ],
+      "size": [
+        150,
+        70
+      ]
+    },
+    {
+      "id": "bank",
+      "type": "backend",
+      "label": "Simulated bank",
+      "sublabel": "Local CSV fixtures",
+      "row": 2,
+      "col": 0,
+      "size": [
+        150,
+        70
+      ],
+      "sources": [
+        {
+          "path": "passport/bank.py",
+          "line": 1,
+          "end_line": 29
+        },
+        {
+          "path": "app.py",
+          "line": 216,
+          "end_line": 237
+        }
+      ]
+    },
+    {
+      "id": "registry",
+      "type": "database",
+      "label": "Summary registry",
+      "sublabel": "data/issued.json",
+      "row": 2,
+      "col": 1,
+      "size": [
+        150,
+        70
+      ],
+      "sources": [
+        {
+          "path": "passport/registry.py",
+          "line": 12,
+          "end_line": 58
+        },
+        {
+          "path": "app.py",
+          "line": 254,
+          "end_line": 283
+        },
+        {
+          "path": "app.py",
+          "line": 360,
+          "end_line": 362
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "browser-upload",
+      "from": "browser",
+      "to": "streamlit",
+      "label": "Uploads / queries",
+      "variant": "emphasis"
+    },
+    {
+      "id": "web-run",
+      "from": "streamlit",
+      "to": "pipeline",
+      "label": "Cached run()",
+      "variant": "emphasis"
+    },
+    {
+      "id": "cli-run",
+      "from": "cli",
+      "to": "pipeline",
+      "label": "run()",
+      "labelAt": [
+        725,
+        154
+      ]
+    },
+    {
+      "id": "parse-input",
+      "from": "pipeline",
+      "to": "parser",
+      "label": "Parse bytes",
+      "labelAt": [
+        725,
+        304
+      ]
+    },
+    {
+      "id": "apply-rules",
+      "from": "pipeline",
+      "to": "rules",
+      "label": "Check rows",
+      "variant": "emphasis"
+    },
+    {
+      "id": "pdf-text-api",
+      "from": "parser",
+      "to": "anthropic",
+      "label": "PDF text \u00b7 HTTPS"
+    },
+    {
+      "id": "fetch-rate",
+      "from": "streamlit",
+      "to": "fx",
+      "label": "Rate \u00b7 HTTPS",
+      "fromSide": "top",
+      "toSide": "right"
+    },
+    {
+      "id": "web-report",
+      "from": "streamlit",
+      "to": "report",
+      "label": "Pass + code",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelDx": 70
+    },
+    {
+      "id": "cli-report",
+      "from": "cli",
+      "to": "report",
+      "label": "Passed + --pdf"
+    },
+    {
+      "id": "simulated-feed",
+      "from": "streamlit",
+      "to": "bank",
+      "label": "Consent / fixture",
+      "fromSide": "bottom",
+      "toSide": "right"
+    },
+    {
+      "id": "web-registry",
+      "from": "streamlit",
+      "to": "registry",
+      "label": "Issue / lookup",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDx": 80,
+      "labelDy": 24
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Current implementation",
+      "items": [
+        "One Python application. Registry functions save summaries and owner emails in data/issued.json; transaction rows are excluded.",
+        "Uploads remain in session state; parsed results have no cache expiry. Demo sign-in accepts an email without proving ownership."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Parsing, feeds and rates",
+      "items": [
+        "Browser CSV uses the selected currency; CLI defaults to SGD. PDF text goes to Anthropic using ANTHROPIC_API_KEY. Bank feeds read fixtures.",
+        "Web FX caches for one hour, then falls back by currency (unknown: 1.0). CLI always uses 0.58. Fallbacks are indicative."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Checks and sharing",
+      "items": [
+        "The gate checks arithmetic and date order, not authenticity or creditworthiness. Code lookup compares the stored summary, not bank data.",
+        "QR and HTTP links open the same app and require network reachability. mailto opens a draft; it neither sends nor attaches the PDF."
+      ]
+    }
+  ]
+}

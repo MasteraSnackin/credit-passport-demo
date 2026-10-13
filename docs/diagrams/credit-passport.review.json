@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "diagram_type": "architecture",
+  "artifact": {
+    "file": "credit-passport.html",
+    "sha256": "fd2c770122ac06cef2a6fa809c69d2a1fedfee86b1bd964120266351c6b047e2",
+    "bytes": 817896
+  },
+  "specification": {
+    "file": "credit-passport.architecture.json",
+    "sha256": "5bbe79262761e5c4ce321ceb72c5ed1a3587545f3cacbb9843045e8f5965cd7f",
+    "bytes": 9382
+  },
+  "scope": "Current committed implementation: logical Python modules, a local durable summary registry, simulated bank fixtures and external calls; not separately deployed services.",
+  "repository_revision": "83cafd68ba6608b8ce906668bff380ce9fdf0f94",
+  "validation": "9/9 showcase, 0 errors, 0 warnings",
+  "browser_evidence": "passed",
+  "browser_evidence_receipt": "credit-passport.visual-check.json",
+  "visual_review": "passed",
+  "review_method": "Image-capable review of all four screenshots produced by the artifact-bound visual-check command.",
+  "reviewed_screenshots": [
+    "credit-passport.visual-check.1440x900.light.png",
+    "credit-passport.visual-check.1440x900.dark.png",
+    "credit-passport.visual-check.2048x1320.light.png",
+    "credit-passport.visual-check.2048x1320.dark.png"
+  ],
+  "observations": [
+    "All eleven nodes and all three context cards fit in both themes at the two screenshot sizes.",
+    "The browser path and branches to the simulated bank, persistent registry, rate API, report builder and PDF parser remain distinct.",
+    "Labels avoid node boxes, no route crossings are visible, and the store is clearly labelled data/issued.json.",
+    "The larger composition uses the available height without a conspicuous empty lower band."
+  ],
+  "correction_rounds": 0,
+  "corrections": [],
+  "manual_interaction_tests": {
+    "status": "not run",
+    "reason": "No custom interaction was requested. Search, focus, route tracing and guided-view controls are supplied by the bundled viewer; this review does not claim that each control was exercised."
+  },
+  "limits": [
+    "Code evidence establishes the checked commit's implementation, not a running deployment or a successful external API response.",
+    "The automated browser receipt intentionally retains visualReview pending; this separate record captures the subsequent image review."
+  ],
+  "revision_update": "Repository source links were repinned to the current history. Topology, layout and authored content are unchanged.",
+  "publication": {
+    "path_format": "repository-root-relative",
+    "normalised_fields": [],
+    "original_receipt_retained_locally": true,
+    "note": "Absolute local path fields were made repository-relative for publication. Artifact and specification hashes, byte counts, source revision and validation outcomes are unchanged."
+  }
+}

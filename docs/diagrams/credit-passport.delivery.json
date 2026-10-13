@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "architecture",
+  "input": "docs/diagrams/credit-passport.architecture.json",
+  "output": "docs/diagrams/credit-passport.html",
+  "specification": {
+    "sha256": "5bbe79262761e5c4ce321ceb72c5ed1a3587545f3cacbb9843045e8f5965cd7f",
+    "bytes": 9382
+  },
+  "artifact": {
+    "sha256": "fd2c770122ac06cef2a6fa809c69d2a1fedfee86b1bd964120266351c6b047e2",
+    "bytes": 817896
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  },
+  "evidence": {
+    "verified": true,
+    "repository": "https://github.com/younis-y/credit-passport",
+    "revision": "83cafd68ba6608b8ce906668bff380ce9fdf0f94",
+    "references": 17
+  },
+  "publication": {
+    "path_format": "repository-root-relative",
+    "normalised_fields": [
+      "input",
+      "output"
+    ],
+    "original_receipt_retained_locally": true,
+    "note": "Absolute local path fields were made repository-relative for publication. Artifact and specification hashes, byte counts, source revision and validation outcomes are unchanged."
+  }
+}
