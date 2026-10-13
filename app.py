@@ -414,7 +414,8 @@ for finding in passport["findings"]:
     html(f'<div class="check"><span class="dot {"good" if finding.ok else "warn"}"></span>'
          f'<div><div class="h">{escape(finding.label)}</div><div class="d">{escape(finding.detail)}</div></div></div>')
     if not finding.evidence.empty:
-        with st.expander(f"Show the {len(finding.evidence)} rows behind this"):
+        count = len(finding.evidence)
+        with st.expander(f"Show the {count} row{'s' if count != 1 else ''} behind this"):
             st.dataframe(finding.evidence.assign(date=finding.evidence["date"].dt.date), hide_index=True)
 
 html('<div class="section">What this does not prove</div>'
