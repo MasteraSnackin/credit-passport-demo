@@ -85,8 +85,8 @@ Use Python 3.13 to match the CI configuration, plus Git and access to the config
 From a terminal on macOS or Linux:
 
 ```sh
-git clone https://github.com/younis-y/credit-passport.git
-cd credit-passport
+git clone https://github.com/younis-y/credit-passport-demo.git
+cd credit-passport-demo
 python3.13 -m venv ../credit-passport-venv
 source ../credit-passport-venv/bin/activate
 python -m pip install -r requirements.txt
@@ -170,8 +170,12 @@ PDF extraction sends the entire extracted statement text to Anthropic. Scanned P
 | Missed-rent CSV | [samples/missed_rent.csv](samples/missed_rent.csv) |
 | Indian-rupee CSV | [samples/india.csv](samples/india.csv) |
 | Interactive system map | [Open the Archify map](docs/diagrams/credit-passport.html) after downloading the checkout |
-| Application screenshot | `<ADD REVIEWED SCREENSHOT OF THE FICTIONAL DEMO HERE>` |
+| Application screenshots | Below, from the fictional demo data |
 | Public deployment | Not documented or verified |
+
+| Welcome | An edited statement is caught | The landlord's view |
+| --- | --- | --- |
+| ![Welcome screen](docs/screenshots/1-welcome.png) | ![Edited statement caught](docs/screenshots/3-edited-caught.png) | ![Landlord verification](docs/screenshots/6-landlord-verify.png) |
 
 The report is one page for the included fixture. Arbitrary uploaded text is not guaranteed to fit one page. Its footer always describes the project as a prototype built on fictional sample data.
 
@@ -216,7 +220,7 @@ The eleven pytest tests cover the genuine fixture summary, edited balances, repo
 
 Local verification on 13 October 2026 passed all eleven tests with Python 3.14.8. Separate CLI checks confirmed exit codes `0`, `1` and `2` for the genuine fixture, edited fixture and a missing file respectively; only the genuine fixture produced a new PDF. These checks do not establish real-bank PDF accuracy, live provider availability, browser behaviour, email delivery, phone access or deployment readiness.
 
-[GitHub Actions](.github/workflows/tests.yml) is configured to run the suite on pushes and pull requests using Python 3.13. A current remote CI result has not been checked.
+[GitHub Actions](.github/workflows/tests.yml) is configured to run the suite on pushes and pull requests using Python 3.13. The run for the latest commit on 13 October 2026 passed.
 
 ## Roadmap
 
@@ -231,7 +235,7 @@ These are proposed improvements, not scheduled commitments:
 
 ## Contributing
 
-Use the [repository issue tracker](https://github.com/younis-y/credit-passport/issues) to describe a reproducible problem or proposed change, then submit a focused [pull request](https://github.com/younis-y/credit-passport/pulls). Run `python -m pytest -q` before submission and update these documents when behaviour changes.
+Use the [repository issue tracker](https://github.com/younis-y/credit-passport-demo/issues) to describe a reproducible problem or proposed change, then submit a focused [pull request](https://github.com/younis-y/credit-passport-demo/pulls). Run `python -m pytest -q` before submission and update these documents when behaviour changes.
 
 Add regression tests for parsing or rule changes. Use fictional statements in tests, screenshots and issues; do not include real account details or API keys. Keep the distinction between arithmetic consistency and source authenticity explicit.
 
@@ -241,4 +245,4 @@ The project licence is not specified, and this checkout contains no `LICENSE` fi
 
 ## Contact / Support
 
-The configured project repository is [Credit Passport on GitHub](https://github.com/younis-y/credit-passport). Use its issue tracker for non-sensitive questions where available. A maintainer contact address, private support channel and support commitments have not been supplied.
+The configured project repository is [Credit Passport on GitHub](https://github.com/younis-y/credit-passport-demo). Use its issue tracker for non-sensitive questions where available. A maintainer contact address, private support channel and support commitments have not been supplied.
