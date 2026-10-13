@@ -118,6 +118,19 @@ def test_simulated_bank_feed_is_labelled_as_simulated():
 
     assert "simulated" in bank.SOURCE.lower()
     for name in bank.BANKS:
-        file, data, currency = bank.fetch_statement(name)
-        assert data and currency in {"SGD", "INR"}
+        feed = bank.fetch_statement(name)
+        assert feed["data"] and feed["holder"] and feed["currency"] in {"SGD", "INR"}
+    assert "simulated" in bank.name_note(bank.SOURCE)
+    assert bank.name_note("Uploaded by the applicant") == "name as given by the applicant"
     assert "source" in registry._summary(build_passport(parse_csv(SAMPLES / "genuine.csv")), "SGD", "", bank.SOURCE)
+
+
+def test_passports_saved_to_an_account_can_be_listed(tmp_path):
+    from passport import registry
+
+    store = tmp_path / "issued.json"
+    genuine = build_passport(parse_csv(SAMPLES / "genuine.csv"))
+    code = registry.issue(genuine, "SGD", "Wei Ling Tan", store=store)
+    assert registry.owned_by("wei@example.com", store=store) == []
+    assert registry.issue(genuine, "SGD", "Wei Ling Tan", owner="Wei@Example.com", store=store) == code
+    assert [c for c, _ in registry.owned_by("wei@example.com", store=store)] == [code]

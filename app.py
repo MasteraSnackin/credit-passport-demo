@@ -2,12 +2,16 @@
 
 Run: streamlit run app.py
 """
+import io
+import socket
+import time
 from datetime import date
 from html import escape
 from urllib.parse import quote
 from pathlib import Path
 
 import requests
+import segno
 import streamlit as st
 
 from passport.parse import StatementError
@@ -104,6 +108,26 @@ def load(name, data, currency):
     return run(name, data, currency)
 
 
+def landlord_link(code):
+    """A link a phone on the same wifi can open: swap localhost for this laptop's network address."""
+    host = st.context.headers.get("host", "localhost:8501")
+    name, _, port = host.partition(":")
+    if name in ("localhost", "127.0.0.1"):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+                probe.connect(("8.8.8.8", 80))
+                host = f"{probe.getsockname()[0]}:{port or 8501}"
+        except OSError:
+            pass
+    return f"http://{host}/?verify={code}"
+
+
+def qr_png(link):
+    picture = io.BytesIO()
+    segno.make(link, error="m").save(picture, kind="png", scale=5, border=2, dark="#1d1d1f")
+    return picture.getvalue()
+
+
 def html(markup):
     st.markdown(markup, unsafe_allow_html=True)
 
@@ -141,8 +165,12 @@ if step == "welcome":
     st.write("")
     if st.button("Get started", type="primary"):
         go("upload")
-    if st.button("I'm a landlord: verify a passport", type="tertiary"):
+    user = st.session_state.get("user", "")
+    left, right, _ = st.columns([1.6, 1, 1.4])
+    if left.button("I'm a landlord: verify a passport", type="tertiary"):
         go("verify")
+    if right.button("My passports" if user else "Sign in", type="tertiary"):
+        go("account" if user else "signin", return_to="account")
     html('<div class="caption">Takes about a minute. Your statement is not stored. We keep only the one-page summary, so your landlord can check it is genuine.</div>')
     st.stop()
 
@@ -171,10 +199,69 @@ if step == "upload":
         html('<div class="caption">Simulated for this prototype: no real bank is contacted. A live version would '
              'receive your transactions straight from the bank, so the file could not be edited on the way.</div>')
         st.write("")
-        if st.button("Connect and check", type="primary"):
-            name, data, bank_currency = bank.fetch_statement(chosen)
-            go("result", applicant=applicant or SAMPLE_NAMES[bank_currency], file=(name, data), currency=bank_currency,
-               source=bank.SOURCE)
+        if st.button("Continue", type="primary"):
+            go("consent", bank=chosen)
+    st.stop()
+
+# 2b. Consent to share, as an open banking provider would ask (simulated)
+if step == "consent":
+    chosen = st.session_state["bank"]
+    items = lambda dot, lines: "".join(f'<div class="check" style="border:none;padding-top:8px"><span class="dot {dot}">'
+                                       f'</span><div class="d" style="margin:0">{line}</div></div>' for line in lines)
+    html(eyebrow("Demo bank connection")
+         + f'<div class="title">Share your statement with Credit Passport</div>'
+         f'<div class="lede">You are connecting {escape(chosen)}. This is a simulation: no real bank is contacted.</div>'
+         '<div class="grid" style="grid-template-columns:1fr 1fr">'
+         f'<div class="card"><div class="h" style="margin-top:0">We will receive</div>{items("good", bank.WE_RECEIVE)}</div>'
+         f'<div class="card"><div class="h" style="margin-top:0">We will never</div>{items("bad", bank.WE_NEVER)}</div>'
+         '</div>')
+    st.write("")
+    left, right, _ = st.columns([1, 1, 2])
+    if left.button("Allow", type="primary"):
+        with st.spinner(f"Connecting to {chosen}"):
+            time.sleep(1.2)  # stands in for the redirect to the bank and back
+            feed = bank.fetch_statement(chosen)
+        go("result", applicant=feed["holder"], file=(feed["name"], feed["data"]), currency=feed["currency"],
+           source=bank.SOURCE)
+    if right.button("Cancel", type="tertiary"):
+        go("upload")
+    st.stop()
+
+# Account: sign in and see saved passports (emulated, no password or email is sent)
+if step == "signin":
+    html(eyebrow("Your account")
+         + '<div class="title">Sign in to keep your passports</div>'
+         '<div class="lede">Enter your email and we will send a one-time sign-in link. No password to remember.</div>')
+    email = st.text_input("Email address", placeholder="you@example.com").strip().lower()
+    html('<div class="caption">Demo: no email is sent. You are signed in straight away.</div>')
+    st.write("")
+    left, right, _ = st.columns([1.4, 1, 1.6])
+    if left.button("Send me a sign-in link", type="primary", disabled="@" not in email):
+        go(st.session_state.get("return_to", "account"), user=email)
+    if right.button("Back", type="tertiary"):
+        go("welcome")
+    st.stop()
+
+if step == "account":
+    user = st.session_state.get("user", "")
+    mine = registry.owned_by(user)
+    html(eyebrow(f"Signed in as {escape(user)}")
+         + '<div class="title">My passports</div>'
+         + (f'<div class="lede">{len(mine)} saved. Each can be sent again or checked by a landlord at any time.</div>'
+            if mine else '<div class="lede">Nothing saved yet. Check a statement and save the passport here.</div>'))
+    for code, record in mine:
+        start, end = (date.fromisoformat(d) for d in record["period"])
+        html(card(("k", f"Issued {date.fromisoformat(record['issued']):%-d %b %Y} · {escape(record['source'].lower())}"),
+                  ("h", escape(record["applicant"]) or "Name not given"),
+                  ("d", f"{start:%-d %b %Y} to {end:%-d %b %Y} · income {record['currency']} "
+                        f"{record['monthly_income'] or 0:,.0f} a month"),
+                  ("v", code)))
+    st.write("")
+    left, right, _ = st.columns([1.3, 1, 1.7])
+    if left.button("Check a statement", type="primary"):
+        go("upload")
+    if right.button("Sign out", type="tertiary"):
+        go("welcome", user="")
     st.stop()
 
 # Landlord: check a passport is genuine
@@ -193,7 +280,8 @@ if step == "verify":
         html(eyebrow(f"Genuine · issued {issued:%-d %b %Y}", "good")
              + f'<div class="title">{escape(record["applicant"]) or "Applicant name not given"}</div>'
              f'<div class="lede">Summary of a bank statement covering {start:%-d %b %Y} to {end:%-d %b %Y}. '
-             f'Source: {escape(record.get("source", UPLOADED).lower())}. '
+             f'Source: {escape(record.get("source", UPLOADED).lower())}; '
+             f'{bank.name_note(record.get("source", UPLOADED))}. '
              'If the page you were sent shows different figures, it has been altered.</div>'
              '<div class="grid">'
              + card(("k", "Monthly income"), ("v", amount(record["monthly_income"])))
@@ -261,7 +349,8 @@ if not passport["verified"]:
     st.stop()
 
 rate, rate_source = gbp_rate(currency)
-code = registry.issue(passport, currency, applicant, source)
+user = st.session_state.get("user", "")
+code = registry.issue(passport, currency, applicant, source, owner=user)
 
 
 def money(label, value):
@@ -283,15 +372,20 @@ html(eyebrow(f"Verified · {start:%-d %b %Y} to {end:%-d %b %Y}", "good")
      + money("Monthly rent", passport["monthly_rent"])
      + card(("k", "Rent as share of income"), ("v", "n/a" if ratio is None else f"{ratio:.0%}"))
      + "</div>"
-     + f'<div class="caption" style="margin-top:8px">{"Prepared for " + escape(applicant) + ". " if applicant else ""}'
+     + f'<div class="caption" style="margin-top:8px">'
+       f'{"Prepared for " + escape(applicant) + " (" + bank.name_note(source) + "). " if applicant else ""}'
        f'Source: {escape(source.lower())}. '
        f'1 {currency} = £{rate:.4f} ({rate_source}).</div>'
      + f'<div class="card" style="margin-top:16px"><div class="k">Verification code</div><div class="v">{code}</div>'
        '<div class="a">Printed on your passport. Your landlord enters it here to confirm the page is genuine.</div></div>')
 
-link = f"http://{st.context.headers.get('host', 'localhost:8501')}/?verify={code}"
-html('<div class="caption" style="margin-top:8px">Link for your landlord:</div>')
-st.code(link, language=None)
+link = landlord_link(code)
+share, scan = st.columns([3, 1])
+with share:
+    html('<div class="caption" style="margin-top:8px">Link for your landlord</div>')
+    st.code(link, language=None)
+    html('<div class="caption">Or let them scan the code. It opens on any phone on the same wifi as this laptop.</div>')
+scan.image(qr_png(link), width=132)
 message = (f"Hello,\n\nPlease find my Credit Passport attached: a checked summary of my income and rent history "
            f"from my bank statement.\n\nYou can confirm it is genuine here:\n{link}\n\n"
            f"Verification code: {code}\n\nKind regards,\n{applicant}")
@@ -301,6 +395,10 @@ left.download_button("Download passport", build_pdf(passport, currency, rate, ra
 middle.link_button("Email my landlord", f"mailto:?subject={quote('My Credit Passport')}&body={quote(message)}")
 if right.button("Check another statement", type="tertiary"):
     go("upload")
+if user:
+    html(f'<div class="caption">Saved to your account, {escape(user)}.</div>')
+elif st.button("Save to my account", type="tertiary"):
+    go("signin", return_to="result")
 
 html('<div class="section">What we checked</div>')
 for finding in passport["findings"]:

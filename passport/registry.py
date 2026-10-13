@@ -30,7 +30,7 @@ def _load(store):
     return json.loads(store.read_text()) if store.exists() else {}
 
 
-def issue(passport, currency, applicant="", source="Uploaded by the applicant", store=STORE):
+def issue(passport, currency, applicant="", source="Uploaded by the applicant", owner="", store=STORE):
     """Record a verified passport and return its code. The same passport always gets the same code."""
     if not passport["verified"]:
         raise ValueError("No passport is issued for a statement that does not add up.")
@@ -39,11 +39,18 @@ def issue(passport, currency, applicant="", source="Uploaded by the applicant", 
     letters = b32encode(digest).decode()[:8]
     code = f"CP-{letters[:4]}-{letters[4:]}"
     issued = _load(store)
-    if code not in issued:
-        issued[code] = {**summary, "issued": date.today().isoformat()}
-        store.parent.mkdir(exist_ok=True)
-        store.write_text(json.dumps(issued, indent=2))
+    record = issued.setdefault(code, {**summary, "issued": date.today().isoformat(), "owner": ""})
+    if owner:
+        record["owner"] = owner.strip().lower()
+    store.parent.mkdir(exist_ok=True)
+    store.write_text(json.dumps(issued, indent=2))
     return code
+
+
+def owned_by(owner, store=STORE):
+    """Every passport saved to this account, newest first, as (code, record) pairs."""
+    mine = [(code, r) for code, r in _load(store).items() if r.get("owner") == owner.strip().lower()]
+    return sorted(mine, key=lambda pair: pair[1]["issued"], reverse=True)
 
 
 def lookup(code, store=STORE):

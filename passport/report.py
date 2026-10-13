@@ -3,6 +3,8 @@ import io
 from datetime import date
 from html import escape
 
+from .bank import name_note
+
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
@@ -46,7 +48,7 @@ def build_pdf(passport, currency, rate, rate_source, applicant="", code="", sour
     out = io.BytesIO()
     SimpleDocTemplate(out, pagesize=A4, topMargin=20 * mm, bottomMargin=18 * mm, title="Credit Passport").build([
         Paragraph("Credit Passport", styles["Title"]),
-        *([Paragraph(f"Prepared for <b>{escape(applicant)}</b> (name as given by the applicant).", styles["Normal"]),
+        *([Paragraph(f"Prepared for <b>{escape(applicant)}</b> ({name_note(source)}).", styles["Normal"]),
            Spacer(1, 4)] if applicant else []),
         Paragraph(f"Summary of a bank statement covering {start:%d %B %Y} to {end:%d %B %Y}. "
                   f"Issued {date.today():%d %B %Y}."
