@@ -134,3 +134,47 @@ def test_passports_saved_to_an_account_can_be_listed(tmp_path):
     assert registry.owned_by("wei@example.com", store=store) == []
     assert registry.issue(genuine, "SGD", "Wei Ling Tan", owner="Wei@Example.com", store=store) == code
     assert [c for c, _ in registry.owned_by("wei@example.com", store=store)] == [code]
+
+
+def _genuine_shifted(shift):
+    """The genuine statement with every balance moved by a fixed amount: still adds up."""
+    table = parse_csv(SAMPLES / "genuine.csv")
+    return table.assign(balance=(table["balance"] + shift).round(2))
+
+
+def test_overdraft_is_reported_but_does_not_block_a_genuine_statement():
+    passport = build_passport(_genuine_shifted(-9000.00))
+    buffer = passport["findings"][3]
+    assert passport["verified"]  # the arithmetic is intact
+    assert not buffer.ok and buffer.label == "Went overdrawn"
+    assert (buffer.evidence["balance"] < 0).all() and len(buffer.evidence) > 0
+
+
+def test_a_single_edited_balance_is_pinpointed():
+    table = parse_csv(SAMPLES / "genuine.csv")
+    table.loc[30, "balance"] += 500.00  # one figure nudged upwards
+    passport = build_passport(table)
+    broken = passport["findings"][0].evidence
+    assert not passport["verified"]
+    # The edited row and the row after it both stop following from their predecessor.
+    assert list(broken.index) == [30, 31]
+
+
+def test_rows_out_of_date_order_cannot_be_verified():
+    table = parse_csv(SAMPLES / "genuine.csv")
+    shuffled = table.iloc[[0, *range(40, 67), *range(1, 40)]].reset_index(drop=True)
+    assert not build_passport(shuffled)["verified"]
+
+
+def test_income_that_appears_in_too_few_months_is_not_called_regular():
+    table = parse_csv(SAMPLES / "genuine.csv")
+    two_months = table[table["date"] < "2026-06-01"]
+    finding = build_passport(two_months)["findings"][1]
+    assert not finding.ok and "No regular income" in finding.detail
+
+
+def test_model_reply_with_a_pipe_in_the_description_still_parses():
+    from passport.parse import parse_lines
+
+    table, _ = parse_lines("SGD\n2026-04-01|OPENING|0|100.00\n2026-04-02|SHOP | CAFE|-10.00|90.00")
+    assert table["description"].iloc[1] == "SHOP | CAFE" and table["balance"].iloc[1] == 90.00

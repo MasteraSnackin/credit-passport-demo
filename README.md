@@ -214,13 +214,15 @@ Provider exceptions and output-write errors are not fully covered by these exit-
 
 ## Tests
 
+See [docs/DEMO.md](docs/DEMO.md) for a step-by-step demonstration script, expected results for every sample, what each test proves, and the browser walkthrough.
+
 ```sh
 python -m pytest -q
 ```
 
-The eleven pytest tests cover the genuine fixture summary, edited balances, report contents and export refusal, model-shaped text parsing, selected malformed inputs, CLI verdicts, missed rent, registry lookup, an Indian CSV layout, the simulated bank feed and account record listing. Registry tests use temporary files. The suite needs no API key; the PDF transcription test constructs model-shaped text from the CSV rather than calling Anthropic.
+The sixteen pytest tests cover the genuine fixture summary, edited balances, report contents and export refusal, model-shaped text parsing, selected malformed inputs, CLI verdicts, missed rent, registry lookup, an Indian CSV layout, the simulated bank feed and account record listing. Registry tests use temporary files. The suite needs no API key; the PDF transcription test constructs model-shaped text from the CSV rather than calling Anthropic.
 
-Local verification on 13 October 2026 passed all eleven tests with Python 3.14.8. Separate CLI checks confirmed exit codes `0`, `1` and `2` for the genuine fixture, edited fixture and a missing file respectively; only the genuine fixture produced a new PDF. These checks do not establish real-bank PDF accuracy, live provider availability, browser behaviour, email delivery, phone access or deployment readiness.
+Local verification on 13 October 2026 passed all sixteen tests with Python 3.13.5. Separate CLI checks confirmed exit codes `0`, `1` and `2` for the genuine fixture, edited fixture and a missing file respectively; only the genuine fixture produced a new PDF. These checks do not establish real-bank PDF accuracy, live provider availability, browser behaviour, email delivery, phone access or deployment readiness.
 
 [GitHub Actions](.github/workflows/tests.yml) is configured to run the suite on pushes and pull requests using Python 3.13. The run for the latest commit on 13 October 2026 passed.
 
