@@ -10,33 +10,18 @@ import pandas as pd
 COLUMNS = ["date", "description", "amount", "balance"]
 MODEL = os.environ.get("PASSPORT_MODEL", "claude-haiku-4-5-20251001")
 
-TOOL = {
-    "name": "record_transactions",
-    "description": "Record every row of the bank statement exactly as printed.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "currency": {"type": "string", "description": "ISO code, e.g. SGD"},
-            "transactions": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "date": {"type": "string", "description": "YYYY-MM-DD"},
-                        "description": {"type": "string"},
-                        "amount": {
-                            "type": "number",
-                            "description": "Money in is positive, money out is negative, 0 for a balance-only row",
-                        },
-                        "balance": {"type": "number", "description": "Running balance printed on the row"},
-                    },
-                    "required": ["date", "description", "amount", "balance"],
-                },
-            },
-        },
-        "required": ["currency", "transactions"],
-    },
-}
+PROMPT = (
+    "Copy every row of this bank statement, including the opening balance row. "
+    "Do not skip, merge, correct or invent rows.\n"
+    "Reply with the ISO currency code on the first line, then one line per row and nothing else:\n"
+    "YYYY-MM-DD|description|amount|balance\n"
+    "Amount is positive for money in, negative for money out, 0 for a balance-only row. "
+    "No thousands separators.\n\n"
+)
+
+
+class StatementError(ValueError):
+    """The statement could not be read into rows. The message is safe to show the user."""
 
 
 def _num(series):
@@ -72,29 +57,41 @@ def parse_csv(file):
 
 
 def parse_pdf(data: bytes):
-    """Read the PDF text, then have the model copy the rows into a fixed shape.
+    """Read the PDF text, then have the model copy the rows out as plain lines.
 
     The model only transcribes. Every judgement is made later by rules, and the
     balance check in rules.py will catch a row the model copied wrongly.
+    Plain lines rather than JSON roughly halve the wait (about 12s for 6 months).
     """
     import anthropic
     import pdfplumber
 
     with pdfplumber.open(io.BytesIO(data)) as pdf:
         text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+    if not text.strip():
+        raise StatementError("This PDF has no readable text. Scanned images are not supported yet.")
 
     response = anthropic.Anthropic().messages.create(
-        model=MODEL,
-        max_tokens=16000,
-        tools=[TOOL],
-        tool_choice={"type": "tool", "name": "record_transactions"},
-        messages=[
-            {
-                "role": "user",
-                "content": "Copy every row of this bank statement, including the opening balance row. "
-                "Do not skip, merge, correct or invent rows.\n\n" + text,
-            }
-        ],
+        model=MODEL, max_tokens=16000, messages=[{"role": "user", "content": PROMPT + text}]
     )
-    block = next(b for b in response.content if b.type == "tool_use")
-    return _tidy(pd.DataFrame(block.input["transactions"])), block.input.get("currency", "")
+    if response.stop_reason != "end_turn":
+        raise StatementError("The statement is too long to read in one go.")
+    return parse_lines(response.content[0].text)
+
+
+def parse_lines(reply: str):
+    """Turn the model's reply into the table. Any line that is not a clean row is an error, never a guess."""
+    currency, *lines = [line.strip() for line in reply.strip().splitlines() if line.strip()]
+    rows = []
+    for line in lines:
+        date, _, rest = line.partition("|")
+        parts = rest.rsplit("|", 2)  # a description may itself contain "|"
+        if len(parts) != 3:
+            raise StatementError(f"Could not read this row: {line!r}")
+        rows.append([date, *parts])
+    if not rows:
+        raise StatementError("No transactions were found in this statement.")
+    try:
+        return _tidy(pd.DataFrame(rows, columns=COLUMNS)), currency.upper()
+    except (ValueError, TypeError) as error:
+        raise StatementError(f"A row has a date or amount that could not be read: {error}") from error

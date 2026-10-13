@@ -7,7 +7,9 @@ from pathlib import Path
 import requests
 import streamlit as st
 
-from passport.parse import parse_csv, parse_pdf
+from passport.parse import StatementError
+from passport.pipeline import run
+from passport.report import build_pdf
 from passport.rules import build_passport
 
 SAMPLES = Path(__file__).parent / "samples"
@@ -28,20 +30,17 @@ def gbp_rate(currency):
 
 @st.cache_data(show_spinner="Reading the statement...")
 def load(name, data):
-    if name.lower().endswith(".pdf"):
-        return parse_pdf(data)
-    import io
-    return parse_csv(io.BytesIO(data)), "SGD"
+    return run(name, data)
 
 
 st.title("Credit Passport")
 st.caption("New to the UK with no credit file? Turn your bank statement from home into a summary "
            "a landlord or lender can check.")
 
-choice = st.radio("Statement", ["Genuine sample (PDF)", "Genuine sample (CSV)", "Tampered sample (CSV)", "Upload my own"],
-                  horizontal=True)
-files = {"Genuine sample (PDF)": "genuine.pdf", "Genuine sample (CSV)": "genuine.csv",
-         "Tampered sample (CSV)": "tampered.csv"}
+# The tampered sample comes first: the demo opens on a fake being caught.
+files = {"Tampered sample (CSV)": "tampered.csv", "Genuine sample (CSV)": "genuine.csv",
+         "Genuine sample (PDF)": "genuine.pdf"}
+choice = st.radio("Statement", [*files, "Upload my own"], horizontal=True)
 if choice in files:
     name, data = files[choice], (SAMPLES / files[choice]).read_bytes()
 else:
@@ -50,9 +49,16 @@ else:
         st.stop()
     name, data = upload.name, upload.getvalue()
 
-tx, currency = load(name, data)
-currency = currency or "SGD"
-passport = build_passport(tx)
+try:
+    result = load(name, data)
+except StatementError as error:
+    st.error(f"**Could not read this statement.** {error}")
+    st.stop()
+except Exception:
+    st.error("**Could not read this statement.** The reading service did not respond. Check the connection "
+             "and the ANTHROPIC_API_KEY, or try a CSV.")
+    st.stop()
+tx, currency, passport = result.transactions, result.currency, result.passport
 rate, rate_source = gbp_rate(currency)
 start, end = passport["period"]
 
@@ -60,6 +66,14 @@ if passport["verified"]:
     st.success(f"**Statement adds up.** {len(tx)} rows, {start:%d %b %Y} to {end:%d %b %Y}.")
 else:
     st.error("**Cannot verify.** This statement does not add up, so the figures below should not be relied on.")
+    broken = passport["findings"][0].evidence
+    if not broken.empty:
+        st.markdown(f"**{len(broken)} row(s) where the balance does not follow from the amount:**")
+        st.dataframe(
+            broken.assign(date=broken["date"].dt.date, gap=(broken["balance"] - broken["expected_balance"]).round(2))
+            .rename(columns={"balance": "balance on statement", "expected_balance": "balance it should be"}),
+            hide_index=True,
+        )
 
 
 def money(value):
@@ -76,6 +90,12 @@ a.metric("Monthly income", money(income), pounds(income), delta_color="off")
 b.metric("Monthly rent", money(rent), pounds(rent), delta_color="off")
 c.metric("Rent as share of income", "n/a" if ratio is None else f"{ratio:.0%}")
 st.caption(f"1 {currency} = £{rate:.4f} ({rate_source}).")
+
+if passport["verified"]:
+    st.download_button("Download the one-page passport (PDF)", build_pdf(passport, currency, rate, rate_source),
+                       file_name="credit-passport.pdf", mime="application/pdf", type="primary")
+else:
+    st.info("No passport is issued for a statement that cannot be verified.")
 
 st.subheader("What we checked")
 for finding in passport["findings"]:
