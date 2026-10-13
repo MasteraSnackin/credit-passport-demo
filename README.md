@@ -78,7 +78,7 @@ Streamlit and the command line share Python parsing and rules modules; PDF extra
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the data model, rule details and implementation limits, or download the [interactive architecture map](docs/diagrams/credit-passport.html) and open it locally. The map's [editable JSON](docs/diagrams/credit-passport.architecture.json) records its components and source references.
 
-The [map publishing workflow](.github/workflows/architecture-pages.yml) publishes only the HTML diagram. The repository owner still needs to select **GitHub Actions** as the source in [Pages settings](https://github.com/younis-y/credit-passport/settings/pages), then run **Publish interactive architecture map** on `main` from the [Actions page](https://github.com/younis-y/credit-passport/actions/workflows/architecture-pages.yml). The hosted map and its interactive controls have not yet been verified.
+The [map publishing workflow](.github/workflows/architecture-pages.yml) publishes only the HTML diagram from the public `credit-passport-demo` repository. The repository owner needs to select **GitHub Actions** as the source in [Pages settings](https://github.com/younis-y/credit-passport-demo/settings/pages), then run **Publish interactive architecture map** on `main` from the [Actions page](https://github.com/younis-y/credit-passport-demo/actions/workflows/architecture-pages.yml). The hosted map and its interactive controls have not yet been verified.
 
 ## Installation
 
