@@ -1,0 +1,58 @@
+name: Publish interactive architecture map
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/diagrams/credit-passport.html
+      - .github/workflows/architecture-pages.yml
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: architecture-github-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Stage the interactive map only
+        id: stage
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_file=docs/diagrams/credit-passport.html
+          test -f "$source_file"
+          test ! -L "$source_file"
+          site_dir=$(mktemp -d "${RUNNER_TEMP}/credit-passport-pages.XXXXXX")
+          cp "$source_file" "$site_dir/index.html"
+          test "$(find "$site_dir" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')" = 1
+          printf 'path=%s\n' "$site_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the map
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ${{ steps.stage.outputs.path }}
+
+      - name: Deploy the map
+        id: deployment
+        uses: actions/deploy-pages@v4

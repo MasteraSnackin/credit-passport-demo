@@ -28,6 +28,8 @@ The web interface and CLI call `passport.pipeline.run(name, data, currency="SGD"
 
 The [interactive system map](docs/diagrams/credit-passport.html) lets readers explore these components and their connections. Its [editable graph](docs/diagrams/credit-passport.architecture.json) is stored alongside it. The map verifies 17 source references at the application commit above and passes all nine Archify checks, automated browser checks and image review in both themes. The [delivery receipt](docs/diagrams/credit-passport.delivery.json) and [review record](docs/diagrams/credit-passport.review.json) record the file hashes and scope; individual interactive controls were not manually exercised.
 
+The [Pages workflow](.github/workflows/architecture-pages.yml) copies this HTML to an otherwise empty publishing directory as `index.html`. It publishes the diagram and its implementation notes; it does not publish or run the application, statement data or local registry. The repository owner must first select **GitHub Actions** in [Pages settings](https://github.com/younis-y/credit-passport/settings/pages), then run **Publish interactive architecture map** on `main`. Hosted deployment and live interaction checks remain pending. Source links within the map require access to the referenced repository.
+
 ```mermaid
 flowchart LR
     User[Applicant or landlord] --> Web[Streamlit interface]
