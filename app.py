@@ -2,6 +2,7 @@
 
 Run: streamlit run app.py
 """
+from datetime import date
 from html import escape
 from pathlib import Path
 
@@ -9,12 +10,14 @@ import requests
 import streamlit as st
 
 from passport.parse import StatementError
+from passport import registry
 from passport.pipeline import run
 from passport.report import build_pdf
 
 SAMPLES = Path(__file__).parent / "samples"
 FALLBACK_RATE = 0.58  # indicative SGD to GBP, used only if the live rate cannot be fetched
-SAMPLES_ON_OFFER = {"Try a genuine sample": "genuine.pdf", "Try an edited sample": "tampered.csv"}
+SAMPLES_ON_OFFER = {"A genuine sample": "genuine.pdf", "An edited sample": "tampered.csv",
+                    "A missed-rent sample": "missed_rent.csv"}
 
 st.set_page_config(page_title="Credit Passport", layout="centered")
 
@@ -113,6 +116,9 @@ def card(*parts):
     return '<div class="card">' + "".join(f'<div class="{cls}">{text}</div>' for cls, text in parts) + "</div>"
 
 
+# A landlord can arrive straight on the verify screen from a link: ?verify=CP-XXXX-XXXX
+if "verify" in st.query_params and "step" not in st.session_state:
+    st.session_state.update(step="verify", code=st.query_params["verify"])
 step = st.session_state.setdefault("step", "welcome")
 
 # 1. Welcome
@@ -129,7 +135,9 @@ if step == "welcome":
     st.write("")
     if st.button("Get started", type="primary"):
         go("upload")
-    html('<div class="caption">Takes about a minute. Your statement is not stored, and your landlord never sees your transactions.</div>')
+    if st.button("I'm a landlord: verify a passport", type="tertiary"):
+        go("verify")
+    html('<div class="caption">Takes about a minute. Your statement is not stored. We keep only the one-page summary, so your landlord can check it is genuine.</div>')
     st.stop()
 
 # 2. Add the statement
@@ -142,10 +150,46 @@ if step == "upload":
     st.write("")
     if st.button("Check my statement", type="primary", disabled=upload is None):
         go("result", applicant=applicant.strip(), file=(upload.name, upload.getvalue()))
-    html('<div class="caption" style="margin-top:24px">No statement to hand?</div>')
-    for column, (label, sample) in zip(st.columns([1, 1, 2]), SAMPLES_ON_OFFER.items()):
+    html('<div class="caption" style="margin-top:24px">No statement to hand? Try:</div>')
+    for column, (label, sample) in zip(st.columns(3), SAMPLES_ON_OFFER.items()):
         if column.button(label, type="tertiary"):
             go("result", applicant=applicant.strip() or "Wei Ling Tan", file=(sample, (SAMPLES / sample).read_bytes()))
+    st.stop()
+
+# Landlord: check a passport is genuine
+if step == "verify":
+    html(eyebrow("For landlords and agents")
+         + '<div class="title">Verify a passport</div>'
+         '<div class="lede">Enter the verification code printed on the passport you were sent. You will see the '
+         'summary exactly as it was issued.</div>')
+    code = st.text_input("Verification code", value=st.session_state.get("code", ""), placeholder="CP-XXXX-XXXX")
+    record = registry.lookup(code) if code.strip() else None
+    if record:
+        currency, ratio = record["currency"], record["rent_to_income"]
+        start, end = (date.fromisoformat(d) for d in record["period"])
+        issued = date.fromisoformat(record["issued"])
+        amount = lambda v: "n/a" if v is None else f"{currency} {v:,.0f}"
+        html(eyebrow(f"Genuine · issued {issued:%-d %b %Y}", "good")
+             + f'<div class="title">{escape(record["applicant"]) or "Applicant name not given"}</div>'
+             f'<div class="lede">Summary of a bank statement covering {start:%-d %b %Y} to {end:%-d %b %Y}. '
+             'If the page you were sent shows different figures, it has been altered.</div>'
+             '<div class="grid">'
+             + card(("k", "Monthly income"), ("v", amount(record["monthly_income"])))
+             + card(("k", "Monthly rent"), ("v", amount(record["monthly_rent"])))
+             + card(("k", "Rent as share of income"), ("v", "n/a" if ratio is None else f"{ratio:.0%}"))
+             + "</div>"
+             + '<div class="section">What was checked</div>'
+             + "".join(f'<div class="check"><span class="dot {"good" if c["ok"] else "warn"}"></span><div>'
+                       f'<div class="h">{escape(c["label"])}</div><div class="d">{escape(c["detail"])}</div></div></div>'
+                       for c in record["checks"]))
+    elif code.strip():
+        html(eyebrow("Not found", "bad") + '<div class="title">No passport has this code.</div>'
+             '<div class="lede">Check the code for typing errors. If it still does not match, do not rely on the '
+             'page you were sent.</div>')
+    st.write("")
+    if st.button("Back to start", type="tertiary"):
+        st.query_params.clear()
+        go("welcome", code="")
     st.stop()
 
 # 3. Result
@@ -194,6 +238,7 @@ if not passport["verified"]:
     st.stop()
 
 rate, rate_source = gbp_rate(currency)
+code = registry.issue(passport, currency, applicant)
 
 
 def money(label, value):
@@ -202,22 +247,27 @@ def money(label, value):
     return card(("k", label), ("v", f"{currency} {value:,.0f}"), ("a", f"about £{value * rate:,.0f}"))
 
 
+# A genuine statement can still carry bad news. It is shown to the applicant before the landlord sees it.
+flagged = [f.label.lower() for f in passport["findings"] if not f.ok]
+notes = f" It includes a note on {' and '.join(flagged)}, shown below." if flagged else ""
 ratio = passport["rent_to_income"]
 html(eyebrow(f"Verified · {start:%-d %b %Y} to {end:%-d %b %Y}", "good")
      + '<div class="title">Your passport is ready.</div>'
-     '<div class="lede">Download it and send it to your landlord or letting agent. They see this summary, '
-     'not your transactions.</div>'
+     f'<div class="lede">Download it and send it to your landlord or letting agent. They see this summary, '
+     f'not your transactions.{notes}</div>'
      '<div class="grid">'
      + money("Monthly income", passport["monthly_income"])
      + money("Monthly rent", passport["monthly_rent"])
      + card(("k", "Rent as share of income"), ("v", "n/a" if ratio is None else f"{ratio:.0%}"))
      + "</div>"
      + f'<div class="caption" style="margin-top:8px">{"Prepared for " + escape(applicant) + ". " if applicant else ""}'
-       f'1 {currency} = £{rate:.4f} ({rate_source}).</div>')
+       f'1 {currency} = £{rate:.4f} ({rate_source}).</div>'
+     + f'<div class="card" style="margin-top:16px"><div class="k">Verification code</div><div class="v">{code}</div>'
+       '<div class="a">Printed on your passport. Your landlord enters it here to confirm the page is genuine.</div></div>')
 
 st.write("")
 left, right, _ = st.columns([1.3, 1.4, 1.3])
-left.download_button("Download passport", build_pdf(passport, currency, rate, rate_source, applicant),
+left.download_button("Download passport", build_pdf(passport, currency, rate, rate_source, applicant, code),
                      file_name="credit-passport.pdf", mime="application/pdf", type="primary")
 if right.button("Check another statement", type="tertiary"):
     go("upload")

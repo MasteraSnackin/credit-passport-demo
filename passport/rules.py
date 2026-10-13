@@ -75,12 +75,16 @@ def find_rent(tx):
     on_time = int(((best["date"].dt.day - usual_day).abs() <= ON_TIME_DAYS).sum())
     active = tx[tx["amount"] != 0]["date"]  # ignore a balance-brought-forward row
     span = len(pd.period_range(active.min(), active.max(), freq="M"))
-    paid = best["date"].dt.to_period("M").nunique()
+    paid_months = set(best["date"].dt.to_period("M"))
+    missed = [m.strftime("%b %Y") for m in pd.period_range(active.min(), active.max(), freq="M") if m not in paid_months]
+    paid = len(paid_months)
     how = "labelled as rent" if named else "largest regular payment, assumed to be rent"
     detail = (
         f"{paid} of {span} months paid, {on_time} within {ON_TIME_DAYS} days of the usual day "
         f"({usual_day}). Typically {rent:,.2f} ({how})."
     )
+    if missed:
+        detail += f" No payment found in {', '.join(missed)}."
     return Finding("Rent payments", paid == span and on_time == paid, detail, best), rent
 
 

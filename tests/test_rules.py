@@ -75,3 +75,28 @@ def test_command_line_exit_code_reports_the_verdict():
     root = SAMPLES.parent
     assert subprocess.run([sys.executable, "-m", "passport", "samples/genuine.csv"], cwd=root).returncode == 0
     assert subprocess.run([sys.executable, "-m", "passport", "samples/tampered.csv"], cwd=root).returncode == 1
+
+
+def test_missed_rent_month_is_named_and_not_reported_as_on_time():
+    passport = build_passport(parse_csv(SAMPLES / "missed_rent.csv"))
+    rent = passport["findings"][2]
+    assert passport["verified"]  # the statement is genuine, so a passport is still issued
+    assert not rent.ok
+    assert "5 of 6 months paid" in rent.detail and "Jul 2026" in rent.detail
+
+
+def test_landlord_can_look_up_an_issued_passport_by_its_code(tmp_path):
+    import pytest
+
+    from passport import registry
+
+    store = tmp_path / "issued.json"
+    genuine = build_passport(parse_csv(SAMPLES / "genuine.csv"))
+    code = registry.issue(genuine, "SGD", "Wei Ling Tan", store=store)
+    assert code == registry.issue(genuine, "SGD", "Wei Ling Tan", store=store)  # stable, no duplicates
+    record = registry.lookup(code.lower() + " ", store=store)
+    assert record["monthly_income"] == 6200.00 and record["applicant"] == "Wei Ling Tan"
+    assert "transactions" not in record and "NTUC" not in store.read_text()
+    assert registry.lookup("CP-AAAA-AAAA", store=store) is None
+    with pytest.raises(ValueError):
+        registry.issue(build_passport(parse_csv(SAMPLES / "tampered.csv")), "SGD", store=store)

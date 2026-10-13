@@ -12,7 +12,7 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 GREEN, AMBER, GREY = colors.HexColor("#1a7f37"), colors.HexColor("#9a6700"), colors.HexColor("#57606a")
 
 
-def build_pdf(passport, currency, rate, rate_source, applicant=""):
+def build_pdf(passport, currency, rate, rate_source, applicant="", code=""):
     if not passport["verified"]:
         raise ValueError("No passport is issued for a statement that does not add up.")
     styles = getSampleStyleSheet()
@@ -57,6 +57,10 @@ def build_pdf(passport, currency, rate, rate_source, applicant=""):
                   "The figures come from a statement supplied by the applicant: the check confirms the statement "
                   "adds up, which catches edited figures but not a statement invented from scratch.", cell),
         Spacer(1, 10),
+        *([Paragraph(f"<b>Verification code: {code}</b>", styles["Normal"]),
+           Paragraph("Landlords: enter this code in Credit Passport under \"Verify a passport\" to see the summary "
+                     "as it was issued. If the figures there differ from this page, this page has been altered.", cell),
+           Spacer(1, 10)] if code else []),
         Paragraph(f"1 {currency} = £{rate:.4f} ({rate_source}). Prototype built on fictional sample data.", small),
     ])
     return out.getvalue()

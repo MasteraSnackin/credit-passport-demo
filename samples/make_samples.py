@@ -17,12 +17,13 @@ SPENDING = [("NTUC FAIRPRICE", 40, 140), ("EZ-LINK TOP UP", 20, 50), ("GRAB", 8,
             ("HAWKER CENTRE PAYNOW", 5, 18), ("SHOPEE SG", 15, 120), ("KOPITIAM", 4, 12)]
 
 
-def build():
+def build(skip_rent=None):
     random.seed(7)
     rows = []
     for month in pd.period_range("2026-04", "2026-09", freq="M"):
         day = lambda d: pd.Timestamp(year=month.year, month=month.month, day=d)
-        rows.append((day(1), "GIRO RENT TIONG BAHRU APT", -2400.00))
+        if str(month) != skip_rent:
+            rows.append((day(1), "GIRO RENT TIONG BAHRU APT", -2400.00))
         rows.append((day(random.choice([1, 2])), "SP SERVICES UTILITIES", -round(random.uniform(95, 150), 2)))
         rows.append((day(12), "SINGTEL MOBILE", -48.00))
         rows.append((day(25), SALARY, 6200.00))
@@ -59,4 +60,6 @@ if __name__ == "__main__":
     rows = tampered.index[tampered["Description"] == SALARY][[1, 4]]
     tampered.loc[rows, "Deposit"] = "9200.00"
     tampered.to_csv(HERE / "tampered.csv", index=False)
-    print("wrote genuine.csv, genuine.pdf, tampered.csv")
+    # Genuine and adds up, but July's rent was never paid. The passport must say so.
+    build(skip_rent="2026-07").to_csv(HERE / "missed_rent.csv", index=False)
+    print("wrote genuine.csv, genuine.pdf, tampered.csv, missed_rent.csv")
