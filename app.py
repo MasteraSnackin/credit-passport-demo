@@ -59,6 +59,10 @@ html, body, [class*="st-"], .stMarkdown {font-family: -apple-system, BlinkMacSys
 .grid {display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;}
 .card {background: var(--card); border-radius: 20px; padding: 24px;}
 .card .k {font-size: 13px; color: var(--grey);}
+.card .n {width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: #fff; font-size: 13px; font-weight: 600;
+          display: flex; align-items: center; justify-content: center; margin-bottom: 16px;}
+.nudge {position: relative; top: -8px;}
+.brand {font-size: 17px; font-weight: 600; letter-spacing: -.01em; color: var(--ink);}
 .card .h {font-size: 17px; font-weight: 600; margin: 8px 0 4px;}
 .card .d {font-size: 15px; line-height: 1.45; color: var(--grey); text-wrap: balance;}
 .card .v {font-size: 28px; font-weight: 600; letter-spacing: -.02em; margin-top: 8px; white-space: nowrap; font-variant-numeric: tabular-nums;}
@@ -153,25 +157,30 @@ step = st.session_state.setdefault("step", "welcome")
 
 # 1. Welcome
 if step == "welcome":
-    html(eyebrow("Credit Passport")
-         + '<div class="hero">Your financial record, wherever you move.</div>'
+    # Top bar: the name on the left, the two side doors on the right, out of the main path.
+    user = st.session_state.get("user", "")
+    brand, verify, account = st.columns([3.1, 1.3, 1.05] if user else [3.5, 1.3, 0.65], vertical_alignment="center")
+    with brand:
+        html('<div class="brand nudge">Credit Passport</div>')
+    if verify.button("Verify a passport", type="tertiary"):
+        go("verify")
+    if account.button("My passports" if user else "Sign in", type="tertiary"):
+        go("account" if user else "signin", return_to="account")
+
+    html('<div class="hero" style="margin-top:56px">Your financial record, wherever you move.</div>'
          '<div class="lede">New to the UK with no credit file? Turn your bank statement from home into proof '
          'a landlord can check.</div>'
          '<div class="grid">'
-         + card(("k", "1"), ("h", "Add your statement"), ("d", "Six months of history, as a PDF or CSV."))
-         + card(("k", "2"), ("h", "We check it"), ("d", "We confirm every balance adds up."))
-         + card(("k", "3"), ("h", "Send your passport"), ("d", "One page your landlord can read."))
+         + card(("n", "1"), ("h", "Add your statement"), ("d", "Six months of history, as a PDF or CSV."))
+         + card(("n", "2"), ("h", "We check it"), ("d", "We confirm every balance adds up."))
+         + card(("n", "3"), ("h", "Send your passport"), ("d", "One page your landlord can read."))
          + "</div>")
-    st.write("")
-    if st.button("Get started", type="primary"):
+    html('<div style="height:16px"></div>')
+    start, note = st.columns([1, 3.2], vertical_alignment="center")
+    if start.button("Get started", type="primary"):
         go("upload")
-    user = st.session_state.get("user", "")
-    left, right, _ = st.columns([1.6, 1, 1.4])
-    if left.button("I'm a landlord: verify a passport", type="tertiary"):
-        go("verify")
-    if right.button("My passports" if user else "Sign in", type="tertiary"):
-        go("account" if user else "signin", return_to="account")
-    html('<div class="caption">Takes about a minute. Your statement is not stored. We keep only the one-page summary, so your landlord can check it is genuine.</div>')
+    with note:
+        html('<div class="caption nudge">Takes about a minute. Your statement is never stored.</div>')
     st.stop()
 
 # 2. Add the statement
