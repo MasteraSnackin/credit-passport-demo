@@ -100,3 +100,24 @@ def test_landlord_can_look_up_an_issued_passport_by_its_code(tmp_path):
     assert registry.lookup("CP-AAAA-AAAA", store=store) is None
     with pytest.raises(ValueError):
         registry.issue(build_passport(parse_csv(SAMPLES / "tampered.csv")), "SGD", store=store)
+
+
+def test_a_second_country_layout_reads_newest_first_rupees():
+    from passport.pipeline import run
+
+    result = run("india.csv", (SAMPLES / "india.csv").read_bytes(), "INR")
+    assert result.currency == "INR"
+    assert result.passport["verified"]
+    assert result.passport["monthly_income"] == 145000.00  # written as 1,45,000.00 in the file
+    assert result.passport["monthly_rent"] == 42000.00
+    assert result.transactions["date"].is_monotonic_increasing
+
+
+def test_simulated_bank_feed_is_labelled_as_simulated():
+    from passport import bank, registry
+
+    assert "simulated" in bank.SOURCE.lower()
+    for name in bank.BANKS:
+        file, data, currency = bank.fetch_statement(name)
+        assert data and currency in {"SGD", "INR"}
+    assert "source" in registry._summary(build_passport(parse_csv(SAMPLES / "genuine.csv")), "SGD", "", bank.SOURCE)

@@ -51,7 +51,42 @@ def write_pdf(df, path):
         Spacer(1, 12), table])
 
 
+def lakh(value):
+    """Indian digit grouping: 1,45,000.00"""
+    whole, cents = f"{value:.2f}".split(".")
+    head, tail = whole[:-3], whole[-3:]
+    groups = []
+    while len(head) > 2:
+        groups.insert(0, head[-2:]); head = head[:-2]
+    return ",".join(([head] if head else []) + groups + [tail]) + "." + cents
+
+
+def build_india():
+    """A second country and layout: rupees, different column names, newest row first."""
+    random.seed(11)
+    spending = [("UPI-BIGBASKET", 400, 2500), ("UPI-SWIGGY", 150, 900), ("UPI-METRO CARD RECHARGE", 200, 500),
+                ("POS-RELIANCE FRESH", 300, 1800), ("UPI-OLA CABS", 120, 650)]
+    rows = []
+    for month in pd.period_range("2026-04", "2026-09", freq="M"):
+        day = lambda d: pd.Timestamp(year=month.year, month=month.month, day=d)
+        rows.append((day(5), "NEFT DR-RENT-KORAMANGALA FLAT-LANDLORD", -42000.00))
+        rows.append((day(7), "BESCOM ELECTRICITY BILL", -round(random.uniform(1400, 2600), 2)))
+        rows.append((day(30 if month.month != 2 else 28), "NEFT CR-SALARY-INDIRANAGAR SOFTWARE PVT LTD", 145000.00))
+        for _ in range(7):
+            name, low, high = random.choice(spending)
+            rows.append((day(random.randint(8, 27)), name, -round(random.uniform(low, high), 2)))
+    rows.sort(key=lambda r: r[0])
+    balance, out = 212500.00, []
+    for i, (date, name, amount) in enumerate(rows):
+        balance = round(balance + amount, 2)
+        out.append((date.strftime("%d %b %Y"), date.strftime("%d %b %Y"), name, f"REF{100200 + i}",
+                    lakh(-amount) if amount < 0 else "", lakh(amount) if amount > 0 else "", lakh(balance)))
+    columns = ["Txn Date", "Value Date", "Narration", "Ref No.", "Debit", "Credit", "Closing Balance"]
+    return pd.DataFrame(out[::-1], columns=columns)
+
+
 if __name__ == "__main__":
+    build_india().to_csv(HERE / "india.csv", index=False)
     genuine = build()
     genuine.to_csv(HERE / "genuine.csv", index=False)
     write_pdf(genuine, HERE / "genuine.pdf")

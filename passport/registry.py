@@ -12,10 +12,11 @@ from pathlib import Path
 STORE = Path(__file__).parent.parent / "data" / "issued.json"
 
 
-def _summary(passport, currency, applicant):
+def _summary(passport, currency, applicant, source):
     start, end = passport["period"]
     return {
         "applicant": applicant,
+        "source": source,
         "currency": currency,
         "period": [start.isoformat(), end.isoformat()],
         "monthly_income": passport["monthly_income"],
@@ -29,11 +30,11 @@ def _load(store):
     return json.loads(store.read_text()) if store.exists() else {}
 
 
-def issue(passport, currency, applicant="", store=STORE):
+def issue(passport, currency, applicant="", source="Uploaded by the applicant", store=STORE):
     """Record a verified passport and return its code. The same passport always gets the same code."""
     if not passport["verified"]:
         raise ValueError("No passport is issued for a statement that does not add up.")
-    summary = _summary(passport, currency, applicant)
+    summary = _summary(passport, currency, applicant, source)
     digest = hashlib.sha256(json.dumps(summary, sort_keys=True).encode()).digest()
     letters = b32encode(digest).decode()[:8]
     code = f"CP-{letters[:4]}-{letters[4:]}"

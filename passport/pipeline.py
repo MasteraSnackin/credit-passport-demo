@@ -12,7 +12,7 @@ import pandas as pd
 from .parse import StatementError, parse_csv, parse_pdf
 from .rules import build_passport
 
-DEFAULT_CURRENCY = "SGD"  # CSV exports do not name their currency
+DEFAULT_CURRENCY = "SGD"  # CSV exports do not name their currency, so the caller says
 
 
 @dataclass
@@ -22,12 +22,13 @@ class Result:
     passport: dict
 
 
-def run(name: str, data: bytes) -> Result:
+def run(name: str, data: bytes, currency: str = DEFAULT_CURRENCY) -> Result:
     if name.lower().endswith(".pdf"):
-        tx, currency = parse_pdf(data)
+        tx, detected = parse_pdf(data)
+        currency = detected or currency
     elif name.lower().endswith(".csv"):
         try:
-            tx, currency = parse_csv(io.BytesIO(data)), DEFAULT_CURRENCY
+            tx = parse_csv(io.BytesIO(data))
         except (KeyError, ValueError) as error:
             raise StatementError(f"This CSV is missing a column or has an unreadable value: {error}") from error
     else:

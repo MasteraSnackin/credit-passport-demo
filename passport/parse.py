@@ -37,23 +37,46 @@ def _tidy(df):
     return df.reset_index(drop=True)
 
 
+# Banks name the same five columns differently. First match wins.
+ALIASES = {
+    "date": ["date", "txn date", "transaction date", "posting date", "value date"],
+    "description": ["description", "narration", "details", "particulars", "transaction details"],
+    "amount": ["amount"],
+    "withdrawal": ["withdrawal", "withdrawals", "debit", "paid out", "dr"],
+    "deposit": ["deposit", "deposits", "credit", "paid in", "cr"],
+    "balance": ["balance", "running balance", "closing balance"],
+}
+
+
+def _column(raw, field, required=True):
+    for name in ALIASES[field]:
+        if name in raw.columns:
+            return raw[name]
+    if required:
+        raise KeyError(f"no {field} column (looked for: {', '.join(ALIASES[field])})")
+    return None
+
+
 def parse_csv(file):
-    raw = pd.read_csv(file)
+    raw = pd.read_csv(file, dtype=str)
     raw.columns = [c.strip().lower() for c in raw.columns]
-    if "amount" in raw.columns:
-        amount = _num(raw["amount"])
+    amount = _column(raw, "amount", required=False)
+    if amount is not None:
+        amount = _num(amount)
     else:
-        amount = _num(raw["deposit"]) - _num(raw["withdrawal"])
-    return _tidy(
-        pd.DataFrame(
-            {
-                "date": pd.to_datetime(raw["date"], dayfirst=True),
-                "description": raw["description"],
-                "amount": amount,
-                "balance": _num(raw["balance"]),
-            }
-        )
+        amount = _num(_column(raw, "deposit")) - _num(_column(raw, "withdrawal"))
+    table = pd.DataFrame(
+        {
+            "date": pd.to_datetime(_column(raw, "date").str.strip(), dayfirst=True, format="mixed"),
+            "description": _column(raw, "description"),
+            "amount": amount,
+            "balance": _num(_column(raw, "balance")),
+        }
     )
+    # Many banks list the newest transaction first. The balance check needs oldest first.
+    if len(table) > 1 and table["date"].iloc[0] > table["date"].iloc[-1]:
+        table = table.iloc[::-1]
+    return _tidy(table)
 
 
 def parse_pdf(data: bytes):

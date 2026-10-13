@@ -4,20 +4,25 @@ Run: streamlit run app.py
 """
 from datetime import date
 from html import escape
+from urllib.parse import quote
 from pathlib import Path
 
 import requests
 import streamlit as st
 
 from passport.parse import StatementError
-from passport import registry
+from passport import bank, registry
 from passport.pipeline import run
 from passport.report import build_pdf
 
 SAMPLES = Path(__file__).parent / "samples"
-FALLBACK_RATE = 0.58  # indicative SGD to GBP, used only if the live rate cannot be fetched
-SAMPLES_ON_OFFER = {"A genuine sample": "genuine.pdf", "An edited sample": "tampered.csv",
-                    "A missed-rent sample": "missed_rent.csv"}
+# Indicative rates to GBP, used only if the live rate cannot be fetched.
+FALLBACK_RATES = {"SGD": 0.58, "INR": 0.0088, "USD": 0.75, "EUR": 0.86, "HKD": 0.096, "MYR": 0.18, "AUD": 0.49}
+CURRENCIES = list(FALLBACK_RATES)
+UPLOADED = "Uploaded by the applicant"
+SAMPLE_NAMES = {"SGD": "Wei Ling Tan", "INR": "Priya Sharma"}  # fictional, used when no name is typed
+SAMPLES_ON_OFFER = {"Genuine": ("genuine.pdf", "SGD"), "Edited": ("tampered.csv", "SGD"),
+                    "Missed rent": ("missed_rent.csv", "SGD"), "India, in rupees": ("india.csv", "INR")}
 
 st.set_page_config(page_title="Credit Passport", layout="centered")
 
@@ -67,7 +72,8 @@ html, body, [class*="st-"], .stMarkdown {font-family: -apple-system, BlinkMacSys
 
 div[data-testid="stExpander"] details {border: none; background: transparent;}
 div[data-testid="stExpander"] summary {padding: 0 0 8px 24px; color: var(--link); font-size: 13px; min-height: 0;}
-.stButton button, .stDownloadButton button {min-height: 44px;}
+.stButton button, .stDownloadButton button, .stLinkButton a {min-height: 44px;}
+.stLinkButton a {border-radius: 980px; padding: 0 24px; font-size: 17px;}
 .stButton button[kind="primary"], .stDownloadButton button {border-radius: 980px; padding: 0 28px; font-size: 17px; font-weight: 500; border: none;}
 .stButton button[kind="tertiary"] {color: var(--link); font-size: 15px;}
 .stTextInput label p, .stFileUploader label p {font-size: 13px; color: var(--grey);}
@@ -90,12 +96,12 @@ def gbp_rate(currency):
                              params={"base": currency, "symbols": "GBP"}, timeout=5).json()
         return reply["rates"]["GBP"], f"European Central Bank rate, {reply['date']}"
     except Exception:
-        return FALLBACK_RATE, "indicative rate, live rate unavailable"
+        return FALLBACK_RATES.get(currency, 1.0), "indicative rate, live rate unavailable"
 
 
 @st.cache_data(show_spinner="Reading the statement")
-def load(name, data):
-    return run(name, data)
+def load(name, data, currency):
+    return run(name, data, currency)
 
 
 def html(markup):
@@ -145,15 +151,30 @@ if step == "upload":
     html(eyebrow("Step 1 of 2")
          + '<div class="title">Add your bank statement</div>'
          '<div class="lede">Download it from your bank\'s app or website, then add it here.</div>')
-    applicant = st.text_input("Your full name", placeholder="As it should appear on your passport")
-    upload = st.file_uploader("Bank statement", type=["pdf", "csv"])
-    st.write("")
-    if st.button("Check my statement", type="primary", disabled=upload is None):
-        go("result", applicant=applicant.strip(), file=(upload.name, upload.getvalue()))
-    html('<div class="caption" style="margin-top:24px">No statement to hand? Try:</div>')
-    for column, (label, sample) in zip(st.columns(3), SAMPLES_ON_OFFER.items()):
-        if column.button(label, type="tertiary"):
-            go("result", applicant=applicant.strip() or "Wei Ling Tan", file=(sample, (SAMPLES / sample).read_bytes()))
+    applicant = st.text_input("Your full name", placeholder="As it should appear on your passport").strip()
+    ways = ["Upload a statement", "Connect your bank (demo)"]
+    way = st.segmented_control("How", ways, default=ways[0], label_visibility="collapsed") or ways[0]
+
+    if way == ways[0]:
+        upload = st.file_uploader("Bank statement", type=["pdf", "csv"])
+        currency = st.selectbox("Statement currency", CURRENCIES, help="Read automatically from PDF statements.")
+        st.write("")
+        if st.button("Check my statement", type="primary", disabled=upload is None):
+            go("result", applicant=applicant, file=(upload.name, upload.getvalue()), currency=currency, source=UPLOADED)
+        html('<div class="caption" style="margin-top:24px">No statement to hand? Try a sample:</div>')
+        for column, (label, (sample, sample_currency)) in zip(st.columns(4), SAMPLES_ON_OFFER.items()):
+            if column.button(label, type="tertiary"):
+                go("result", applicant=applicant or SAMPLE_NAMES[sample_currency], file=(sample, (SAMPLES / sample).read_bytes()),
+                   currency=sample_currency, source=UPLOADED)
+    else:
+        chosen = st.selectbox("Your bank", list(bank.BANKS))
+        html('<div class="caption">Simulated for this prototype: no real bank is contacted. A live version would '
+             'receive your transactions straight from the bank, so the file could not be edited on the way.</div>')
+        st.write("")
+        if st.button("Connect and check", type="primary"):
+            name, data, bank_currency = bank.fetch_statement(chosen)
+            go("result", applicant=applicant or SAMPLE_NAMES[bank_currency], file=(name, data), currency=bank_currency,
+               source=bank.SOURCE)
     st.stop()
 
 # Landlord: check a passport is genuine
@@ -172,6 +193,7 @@ if step == "verify":
         html(eyebrow(f"Genuine · issued {issued:%-d %b %Y}", "good")
              + f'<div class="title">{escape(record["applicant"]) or "Applicant name not given"}</div>'
              f'<div class="lede">Summary of a bank statement covering {start:%-d %b %Y} to {end:%-d %b %Y}. '
+             f'Source: {escape(record.get("source", UPLOADED).lower())}. '
              'If the page you were sent shows different figures, it has been altered.</div>'
              '<div class="grid">'
              + card(("k", "Monthly income"), ("v", amount(record["monthly_income"])))
@@ -195,6 +217,7 @@ if step == "verify":
 # 3. Result
 name, data = st.session_state["file"]
 applicant = st.session_state.get("applicant", "")
+source = st.session_state.get("source", UPLOADED)
 
 
 def could_not_read(reason):
@@ -206,7 +229,7 @@ def could_not_read(reason):
 
 
 try:
-    result = load(name, data)
+    result = load(name, data, st.session_state.get("currency", "SGD"))
 except StatementError as error:
     could_not_read(str(error))
 except Exception:
@@ -238,7 +261,7 @@ if not passport["verified"]:
     st.stop()
 
 rate, rate_source = gbp_rate(currency)
-code = registry.issue(passport, currency, applicant)
+code = registry.issue(passport, currency, applicant, source)
 
 
 def money(label, value):
@@ -261,14 +284,21 @@ html(eyebrow(f"Verified · {start:%-d %b %Y} to {end:%-d %b %Y}", "good")
      + card(("k", "Rent as share of income"), ("v", "n/a" if ratio is None else f"{ratio:.0%}"))
      + "</div>"
      + f'<div class="caption" style="margin-top:8px">{"Prepared for " + escape(applicant) + ". " if applicant else ""}'
+       f'Source: {escape(source.lower())}. '
        f'1 {currency} = £{rate:.4f} ({rate_source}).</div>'
      + f'<div class="card" style="margin-top:16px"><div class="k">Verification code</div><div class="v">{code}</div>'
        '<div class="a">Printed on your passport. Your landlord enters it here to confirm the page is genuine.</div></div>')
 
-st.write("")
-left, right, _ = st.columns([1.3, 1.4, 1.3])
-left.download_button("Download passport", build_pdf(passport, currency, rate, rate_source, applicant, code),
+link = f"http://{st.context.headers.get('host', 'localhost:8501')}/?verify={code}"
+html('<div class="caption" style="margin-top:8px">Link for your landlord:</div>')
+st.code(link, language=None)
+message = (f"Hello,\n\nPlease find my Credit Passport attached: a checked summary of my income and rent history "
+           f"from my bank statement.\n\nYou can confirm it is genuine here:\n{link}\n\n"
+           f"Verification code: {code}\n\nKind regards,\n{applicant}")
+left, middle, right = st.columns([1.25, 1.25, 1.5])
+left.download_button("Download passport", build_pdf(passport, currency, rate, rate_source, applicant, code, source),
                      file_name="credit-passport.pdf", mime="application/pdf", type="primary")
+middle.link_button("Email my landlord", f"mailto:?subject={quote('My Credit Passport')}&body={quote(message)}")
 if right.button("Check another statement", type="tertiary"):
     go("upload")
 
