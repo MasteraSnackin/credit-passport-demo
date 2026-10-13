@@ -1,6 +1,7 @@
 """The one-page passport a landlord or lender keeps. Summary only, never the full statement."""
 import io
 from datetime import date
+from html import escape
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -11,7 +12,7 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 GREEN, AMBER, GREY = colors.HexColor("#1a7f37"), colors.HexColor("#9a6700"), colors.HexColor("#57606a")
 
 
-def build_pdf(passport, currency, rate, rate_source):
+def build_pdf(passport, currency, rate, rate_source, applicant=""):
     if not passport["verified"]:
         raise ValueError("No passport is issued for a statement that does not add up.")
     styles = getSampleStyleSheet()
@@ -45,6 +46,8 @@ def build_pdf(passport, currency, rate, rate_source):
     out = io.BytesIO()
     SimpleDocTemplate(out, pagesize=A4, topMargin=20 * mm, bottomMargin=18 * mm, title="Credit Passport").build([
         Paragraph("Credit Passport", styles["Title"]),
+        *([Paragraph(f"Prepared for <b>{escape(applicant)}</b> (name as given by the applicant).", styles["Normal"]),
+           Spacer(1, 4)] if applicant else []),
         Paragraph(f"Summary of a bank statement covering {start:%d %B %Y} to {end:%d %B %Y}. "
                   f"Issued {date.today():%d %B %Y}.", styles["Normal"]),
         Spacer(1, 10), figures, Spacer(1, 14),
